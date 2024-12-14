@@ -1,27 +1,35 @@
-// components/qc/CSVUpload.tsx
 import React, { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { parse } from "papaparse";
 import { QCRecord } from "../../types/qc";
-import LeveyJenningsChart from "../LeveyJenningsChart";
+import MultiGraphLayout from "../MultiGraphLayout";
 
-// Add styling for better UX/UI
 const CSVUpload: React.FC = () => {
-  const [qcData, setQcData] = useState<QCRecord[]>([]);
+  const [chartDataList, setChartDataList] = useState<
+    {
+      id: number;
+      analyte: string;
+      mean: number;
+      cv: number;
+      data: QCRecord[];
+    }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [fileName, setFileName] = useState<string>("");
 
-  // Handle file upload via dropzone
   const onDrop = (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (file) {
-      // Reset states
-      setError(null);
-      setIsLoading(true);
-      setFileName(file.name);
+    setError(null);
+    setIsLoading(true);
 
-      // Parse CSV using papaparse
+    const newChartDataList: {
+      id: number;
+      analyte: string;
+      mean: number;
+      cv: number;
+      data: QCRecord[];
+    }[] = [];
+
+    acceptedFiles.forEach((file, index) => {
       parse(file, {
         complete: (result) => {
           const data: QCRecord[] = result.data.map((row: any) => ({
@@ -30,32 +38,47 @@ const CSVUpload: React.FC = () => {
             result: parseFloat(row.result),
           }));
 
-          // Check if the data is valid
           if (
             data.every(
               (record) => record.id && record.date && !isNaN(record.result)
             )
           ) {
-            setQcData(data);
+            // Calculate mean and CV (example: you can adjust as needed)
+            const results = data.map((record) => record.result);
+            const mean =
+              results.reduce((acc, curr) => acc + curr, 0) / results.length;
+            const variance =
+              results.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) /
+              results.length;
+            const stdDev = Math.sqrt(variance);
+            const cv = (stdDev / mean) * 100;
+
+            newChartDataList.push({
+              id: index + 1,
+              analyte: file.name.split(".")[0], // Use file name as analyte for simplicity
+              mean: parseFloat(mean.toFixed(3)), // Round mean to 3 decimal places
+              cv: parseFloat(cv.toFixed(3)), // Round CV to 3 decimal places
+              data,
+            });
           } else {
-            setError(
-              "Invalid CSV format. Please ensure the CSV is correctly structured."
-            );
+            setError(`Invalid CSV format in file: ${file.name}`);
           }
 
-          setIsLoading(false);
+          if (newChartDataList.length === acceptedFiles.length) {
+            setChartDataList((prev) => [...prev, ...newChartDataList]);
+            setIsLoading(false);
+          }
         },
         header: true,
         skipEmptyLines: true,
       });
-    }
+    });
   };
 
-  // Initialize dropzone hook
   const { getRootProps, getInputProps } = useDropzone({
     onDrop,
-    accept: { "text/csv": [".csv"] }, // Ensure only CSV files are accepted
-    multiple: false, // Allow only one file
+    accept: { "text/csv": [".csv"] },
+    multiple: true,
   });
 
   return (
@@ -67,69 +90,20 @@ const CSVUpload: React.FC = () => {
         <input {...getInputProps()} />
         {isLoading ? (
           <div className="loading-spinner">
-            <svg
-              className="w-8 h-8 mx-auto text-gray-400 animate-spin"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 0116 0 8 8 0 01-16 0z"
-              ></path>
-            </svg>
-            <p className="mt-2 text-gray-500">Processing your file...</p>
+            <p className="text-gray-500">Processing your files...</p>
           </div>
         ) : (
-          <>
-            <p className="text-lg text-gray-700">
-              Drag & drop a CSV file here, or click to select one
-            </p>
-            <p className="text-sm text-gray-400">Only .csv files are allowed</p>
-          </>
+          <p className="text-lg text-gray-700">
+            Drag & drop CSV files here, or click to select files
+          </p>
         )}
       </div>
 
-      {error && (
-        <div className="error-message text-red-600 p-2 rounded-md mb-4">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message text-red-600 mb-4">{error}</div>}
 
-      {fileName && !isLoading && !error && (
-        <div className="file-name mb-4 text-gray-700">
-          <strong>File Selected:</strong> {fileName}
-        </div>
+      {chartDataList.length > 0 && (
+        <MultiGraphLayout chartDataList={chartDataList} />
       )}
-
-      {qcData.length > 0 && !isLoading && !error && (
-        <div>
-          <h3 className="mt-4 text-2xl font-semibold text-gray-800">
-            Levey-Jennings Chart
-          </h3>
-          <LeveyJenningsChart data={qcData} />
-        </div>
-      )}
-
-      <button
-        className="reset-button mt-4 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-all"
-        onClick={() => {
-          setQcData([]);
-          setError(null);
-          setFileName("");
-        }}
-      >
-        Reset Upload
-      </button>
     </div>
   );
 };
