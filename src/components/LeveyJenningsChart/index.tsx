@@ -12,6 +12,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import "./styles.css";
 
 // Register Chart.js components
 ChartJS.register(
@@ -23,7 +24,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
 
 interface LeveyJenningsChartProps {
   data: QCRecord[];
