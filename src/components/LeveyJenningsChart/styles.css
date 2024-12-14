@@ -1,0 +1,13 @@
+/* styles.css */
+.no-data-message {
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+}
+
+.no-data-message p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
